@@ -106,28 +106,38 @@ if st.sidebar.button("Fetch and Forecast"):
 
             elif model_option == "Prophet":
                 st.info("Using Prophet for Forecasting...")
-                # Prepare data for Prophet
-                prophet_data = pd.DataFrame({
-                    "ds": ts_data.index,
-                    "y": ts_data.values
-                })
+                try:
+                    # Prepare data for Prophet
+                    prophet_data = pd.DataFrame({
+                        "ds": ts_data.index,
+                        "y": ts_data.values
+                    })
 
-                # Fit Prophet model
-                prophet_model = Prophet(daily_seasonality=True)
-                prophet_model.fit(prophet_data)
+                    # Ensure correct data types
+                    prophet_data['ds'] = pd.to_datetime(prophet_data['ds'])
+                    prophet_data['y'] = pd.to_numeric(prophet_data['y'], errors='coerce')
 
-                # Create future dataframe
-                future = prophet_model.make_future_dataframe(periods=180)
-                forecast = prophet_model.predict(future)
+                    # Drop any rows with NaN values (just in case)
+                    prophet_data = prophet_data.dropna()
 
-                # Extract forecasted values
-                forecast_dates = forecast['ds'][-180:]
-                forecast_values = forecast['yhat'][-180:].values
+                    # Fit Prophet model
+                    prophet_model = Prophet(daily_seasonality=True)
+                    prophet_model.fit(prophet_data)
 
-                forecast_df = pd.DataFrame({
-                    'Date': forecast_dates,
-                    'Forecasted Price': forecast_values
-                })
+                    # Create future dataframe
+                    future = prophet_model.make_future_dataframe(periods=180)
+                    forecast = prophet_model.predict(future)
+
+                    # Extract forecasted values
+                    forecast_dates = forecast['ds'][-180:]
+                    forecast_values = forecast['yhat'][-180:].values
+
+                    forecast_df = pd.DataFrame({
+                        'Date': forecast_dates,
+                        'Forecasted Price': forecast_values
+                    })
+                except Exception as prophet_error:
+                    st.error(f"Error with Prophet model: {prophet_error}")
 
             # Prepare Forecast DataFrame (for ARIMA, SARIMA, and LSTM)
             if model_option != "Prophet":
