@@ -46,12 +46,16 @@ if st.sidebar.button("Fetch and Forecast"):
             # Prepare data for forecasting
             ts_data = data['Close'].dropna()
 
+            forecast_df = None  # Initialize forecast_df
+
             if model_option == "ARIMA":
                 st.info("Using ARIMA for Forecasting...")
                 # ARIMA Model
                 model = ARIMA(ts_data, order=(5, 1, 0))  # Default ARIMA order
                 model_fit = model.fit()
                 forecast = model_fit.forecast(steps=180)  # Forecast next 6 months
+                forecast_dates = pd.date_range(start=ts_data.index[-1], periods=181, freq='B')[1:]
+                forecast_df = pd.DataFrame({'Date': forecast_dates, 'Forecasted Price': forecast})
 
             elif model_option == "SARIMA":
                 st.info("Using SARIMA for Forecasting...")
@@ -59,6 +63,8 @@ if st.sidebar.button("Fetch and Forecast"):
                 model = SARIMAX(ts_data, order=(1, 1, 1), seasonal_order=(1, 1, 1, 12))
                 model_fit = model.fit(disp=False)
                 forecast = model_fit.forecast(steps=180)
+                forecast_dates = pd.date_range(start=ts_data.index[-1], periods=181, freq='B')[1:]
+                forecast_df = pd.DataFrame({'Date': forecast_dates, 'Forecasted Price': forecast})
 
             elif model_option == "LSTM":
                 st.info("Using LSTM for Forecasting...")
@@ -103,6 +109,8 @@ if st.sidebar.button("Fetch and Forecast"):
                     last_sequence = np.append(last_sequence[1:], pred, axis=0)
 
                 forecast = scaler.inverse_transform(np.array(forecast).reshape(-1, 1)).flatten()
+                forecast_dates = pd.date_range(start=ts_data.index[-1], periods=181, freq='B')[1:]
+                forecast_df = pd.DataFrame({'Date': forecast_dates, 'Forecasted Price': forecast})
 
             elif model_option == "Prophet":
                 st.info("Using Prophet for Forecasting...")
@@ -116,8 +124,6 @@ if st.sidebar.button("Fetch and Forecast"):
                     # Ensure correct data types
                     prophet_data['ds'] = pd.to_datetime(prophet_data['ds'])
                     prophet_data['y'] = pd.to_numeric(prophet_data['y'], errors='coerce')
-
-                    # Drop any rows with NaN values (just in case)
                     prophet_data = prophet_data.dropna()
 
                     # Fit Prophet model
@@ -138,28 +144,25 @@ if st.sidebar.button("Fetch and Forecast"):
                     })
                 except Exception as prophet_error:
                     st.error(f"Error with Prophet model: {prophet_error}")
+                    forecast_df = None
 
-            # Prepare Forecast DataFrame (for ARIMA, SARIMA, and LSTM)
-            if model_option != "Prophet":
-                forecast_dates = pd.date_range(start=ts_data.index[-1], periods=181, freq='B')[1:]
-                forecast_df = pd.DataFrame({'Date': forecast_dates, 'Forecasted Price': forecast})
-
-            # Display Forecast
-            st.write("Forecasted Prices for Next 6 Months:")
-            st.dataframe(forecast_df)
-
-            # Plot Historical and Forecasted Data
-            plt.figure(figsize=(12, 6))
-            plt.plot(ts_data.index, ts_data.values, label="Historical Prices", color="blue")
-            if model_option == "Prophet":
-                plt.plot(forecast_dates, forecast_values, label="Forecasted Prices", color="red")
+            # Handle case when forecast_df is None
+            if forecast_df is None:
+                st.error("Forecast could not be generated due to an issue with the selected model.")
             else:
-                plt.plot(forecast_dates, forecast, label="Forecasted Prices", color="red")
-            plt.title(f"Stock Price Forecast for {ticker} ({model_option})")
-            plt.xlabel("Date")
-            plt.ylabel("Price")
-            plt.legend()
-            st.pyplot(plt)
+                # Display Forecasted Data
+                st.write("Forecasted Prices for Next 6 Months:")
+                st.dataframe(forecast_df)
+
+                # Plot Historical and Forecasted Data
+                plt.figure(figsize=(12, 6))
+                plt.plot(ts_data.index, ts_data.values, label="Historical Prices", color="blue")
+                plt.plot(forecast_df['Date'], forecast_df['Forecasted Price'], label="Forecasted Prices", color="red")
+                plt.title(f"Stock Price Forecast for {ticker} ({model_option})")
+                plt.xlabel("Date")
+                plt.ylabel("Price")
+                plt.legend()
+                st.pyplot(plt)
 
     except Exception as e:
         st.error(f"Error: {e}")
