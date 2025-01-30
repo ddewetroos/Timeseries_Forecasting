@@ -7,3 +7,6 @@ tensorflow
 scikit-learn
 prophet
 matplotlib
+scipy
+textblob
+requests
